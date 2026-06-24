@@ -135,7 +135,7 @@
 
   /* ===== SOBRE NOSOTROS (scroll-scrub de video + flip) ===== */
   #nosotros{ max-width:none; padding:0; }
-  .about-track{ position:relative; height:280vh; }
+  .about-track{ position:relative; height:600vh; }
   .about-sticky{ position:sticky; top:0; min-height:100vh; display:flex; align-items:center; }
   .about-cols{ width:100%; max-width:var(--maxw); margin:0 auto; padding:clamp(90px,12vh,150px) var(--pad);
     display:grid; grid-template-columns:1fr 1fr; gap:clamp(28px,5vw,72px); align-items:center; }
@@ -349,7 +349,7 @@
         <div class="vidcard" id="vidcard">
           <div class="vidcard-inner" id="vidInner">
             <div class="vidface vidfront">
-              <span class="vid-tag">CAR Tecnología</span>
+              <span class="vid-tag">CARTecnology</span>
               <video id="vidA" muted playsinline preload="auto" src="videos/Video_Final_Cartecnology.mp4"></video>
             </div>
             <div class="vidface vidback">
@@ -686,27 +686,35 @@
     vidA.addEventListener('loadeddata',()=>{ try{ vidA.currentTime=0.05; }catch(e){} });
     vidB.addEventListener('loadeddata',()=>{ try{ vidB.currentTime=0.05; }catch(e){} });
 
-    const FLIP=0.5;                       /* a mitad del recorrido gira y cambia de video */
-    let ticking=false;
-    function update(){
-      ticking=false;
+    const FLIP=0.5;        /* a mitad del recorrido gira y cambia de video */
+    const EASE=0.12;       /* suavizado del scrub: menor = más suave (y más "trailing") */
+    let active=false, rafId=0;
+    function progress(){
       const total=track.offsetHeight - innerHeight;
-      let p = total>0 ? (-track.getBoundingClientRect().top/total) : 0;
-      p=Math.min(Math.max(p,0),1);
-      if(p < FLIP){
-        inner.classList.remove('flipped');
-        const sub=p/FLIP;
-        if(durA) try{ vidA.currentTime=Math.min(sub*durA, durA-0.04); }catch(e){}
-      } else {
-        inner.classList.add('flipped');
-        const sub=(p-FLIP)/(1-FLIP);
-        if(durB) try{ vidB.currentTime=Math.min(sub*durB, durB-0.04); }catch(e){}
+      const p=total>0 ? (-track.getBoundingClientRect().top/total) : 0;
+      return Math.min(Math.max(p,0),1);
+    }
+    function loop(){
+      const p=progress();
+      let vid, dur, sub;
+      if(p < FLIP){ inner.classList.remove('flipped'); vid=vidA; dur=durA; sub=p/FLIP; }
+      else { inner.classList.add('flipped'); vid=vidB; dur=durB; sub=(p-FLIP)/(1-FLIP); }
+      if(dur && vid.readyState>=2){
+        const target=Math.min(sub*dur, dur-0.05);
+        const cur=vid.currentTime;
+        if(Math.abs(target-cur) > 0.012){
+          try{ vid.currentTime = cur + (target-cur)*EASE; }catch(e){}   /* persigue suave, no salta */
+        }
       }
       if(bar) bar.style.transform='scaleX('+p.toFixed(3)+')';
+      if(active) rafId=requestAnimationFrame(loop);
     }
-    addEventListener('scroll',()=>{ if(!ticking){ ticking=true; requestAnimationFrame(update); } },{passive:true});
-    addEventListener('resize',()=>{ if(!ticking){ ticking=true; requestAnimationFrame(update); } });
-    update();
+    /* solo corre el loop mientras la sección está cerca del viewport */
+    const io=new IntersectionObserver(es=>es.forEach(e=>{
+      if(e.isIntersecting){ if(!active){ active=true; rafId=requestAnimationFrame(loop); } }
+      else { active=false; cancelAnimationFrame(rafId); }
+    }),{rootMargin:'200px 0px'});
+    io.observe(track);
   })();
 
   /* ---- Pill indicator nav ---- */
